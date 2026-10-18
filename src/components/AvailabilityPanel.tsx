@@ -25,13 +25,13 @@ export function AvailabilityPanel({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function load() {
+  async function load(opts?: { silent?: boolean }) {
     if (!startDate || !endDate) return;
     if (endDate < startDate) {
       setError("End date must be on or after the start date");
       return;
     }
-    setLoading(true);
+    if (!opts?.silent) setLoading(true);
     setError(null);
     try {
       const res = await fetch(
@@ -41,16 +41,22 @@ export function AvailabilityPanel({
       if (!res.ok) throw new Error(data.error || "Could not load availability");
       setDays(data.days);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load");
+      if (!opts?.silent) {
+        setError(err instanceof Error ? err.message : "Failed to load");
+      }
     } finally {
-      setLoading(false);
+      if (!opts?.silent) setLoading(false);
     }
   }
 
   useEffect(() => {
     void load();
+    const pollId = window.setInterval(() => {
+      void load({ silent: true });
+    }, 20_000);
+    return () => window.clearInterval(pollId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [startDate, endDate]);
 
   const summary = useMemo(() => {
     return members.map((member) => {

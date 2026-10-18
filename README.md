@@ -43,6 +43,23 @@ Admin: [http://localhost:3000/admin](http://localhost:3000/admin)
 
 Push to GitHub, then deploy on Vercel. Set the same env vars in the Vercel project. The build runs `prisma db push` so the schema is applied automatically.
 
+### Custom domain: thefamilycalendar.com
+
+The Vercel project expects this domain. At your DNS provider (currently IONOS / `ui-dns`), either:
+
+**Option A — nameservers (recommended)**  
+Set nameservers to:
+- `ns1.vercel-dns.com`
+- `ns2.vercel-dns.com`
+
+**Option B — A / CNAME records**  
+- `@` → A `216.198.79.1` and A `64.29.17.1`  
+- `www` → CNAME `640d5edfc1f1ba6d.vercel-dns-017.com.`
+
+Then run `vercel domains verify thefamilycalendar.com`.
+
+Set `APP_BASE_URL` and `NEXT_PUBLIC_APP_URL` to `https://thefamilycalendar.com` so invite emails use the correct links. Configure SMTP env vars for real email delivery.
+
 ## Emails
 
 Without SMTP env vars, outbound mail uses Ethereal. Open preview links from **Admin → Email outbox**.

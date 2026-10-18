@@ -43,8 +43,8 @@ export function CalendarApp() {
   const [editing, setEditing] = useState<ActivityDTO | null>(null);
   const [ready, setReady] = useState(false);
 
-  async function load() {
-    setLoading(true);
+  async function load(opts?: { silent?: boolean }) {
+    if (!opts?.silent) setLoading(true);
     setError(null);
     try {
       const meRes = await fetch("/api/auth/me");
@@ -72,9 +72,11 @@ export function CalendarApp() {
           : json.members.map((m) => m.id),
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load");
+      if (!opts?.silent) {
+        setError(err instanceof Error ? err.message : "Failed to load");
+      }
     } finally {
-      setLoading(false);
+      if (!opts?.silent) setLoading(false);
     }
   }
 
@@ -84,6 +86,25 @@ export function CalendarApp() {
     setSelectedDay(format(now, "yyyy-MM-dd"));
     setReady(true);
     void load();
+
+    // Keep calendars in sync across family members without a full page reload.
+    const pollId = window.setInterval(() => {
+      void load({ silent: true });
+    }, 12_000);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        void load({ silent: true });
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+
+    return () => {
+      window.clearInterval(pollId);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const me: MemberDTO | null = data?.me ?? null;
