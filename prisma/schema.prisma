@@ -1,0 +1,95 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Family {
+  id        String         @id @default(cuid())
+  name      String
+  createdAt DateTime       @default(now())
+  members   Member[]
+  invites   FamilyInvite[]
+}
+
+model Member {
+  id           String         @id @default(cuid())
+  name         String
+  email        String         @unique
+  passwordHash String
+  color        String
+  timezone     String
+  role         String         @default("MEMBER") // ADMIN | MEMBER
+  status       String         @default("PENDING") // PENDING | ACTIVE | REJECTED
+  familyId     String
+  family       Family         @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  activities   Activity[]     @relation("ActivityHost")
+  invitesSent  FamilyInvite[] @relation("InviteSender")
+  eventInvites ActivityInvite[]
+  createdAt    DateTime       @default(now())
+
+  @@index([familyId])
+  @@index([status])
+}
+
+model FamilyInvite {
+  id          String   @id @default(cuid())
+  email       String
+  token       String   @unique
+  status      String   @default("PENDING") // PENDING | ACCEPTED | REVOKED
+  familyId    String
+  family      Family   @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  invitedById String
+  invitedBy   Member   @relation("InviteSender", fields: [invitedById], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  expiresAt   DateTime
+
+  @@index([email])
+  @@index([familyId])
+}
+
+model Activity {
+  id          String           @id @default(cuid())
+  title       String
+  description String           @default("")
+  startAt     DateTime
+  endAt       DateTime
+  allDay      Boolean          @default(false)
+  memberId    String
+  member      Member           @relation("ActivityHost", fields: [memberId], references: [id], onDelete: Cascade)
+  invites     ActivityInvite[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@index([memberId])
+  @@index([startAt, endAt])
+}
+
+model ActivityInvite {
+  id         String   @id @default(cuid())
+  activityId String
+  activity   Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  memberId   String
+  member     Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  token      String   @unique
+  status     String   @default("PENDING") // PENDING | ACCEPTED | DECLINED
+  createdAt  DateTime @default(now())
+  respondedAt DateTime?
+
+  @@unique([activityId, memberId])
+  @@index([memberId])
+  @@index([token])
+}
+
+model EmailLog {
+  id        String   @id @default(cuid())
+  to        String
+  subject   String
+  body      String
+  previewUrl String?
+  status    String   @default("LOGGED") // LOGGED | SENT | FAILED
+  createdAt DateTime @default(now())
+}

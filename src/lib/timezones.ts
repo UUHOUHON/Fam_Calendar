@@ -1,0 +1,31 @@
+export const COMMON_TIMEZONES = [
+  { value: "Pacific/Honolulu", label: "Hawaii (HST)" },
+  { value: "America/Los_Angeles", label: "Pacific Time (US)" },
+  { value: "America/Denver", label: "Mountain Time (US)" },
+  { value: "America/Chicago", label: "Central Time (US)" },
+  { value: "America/New_York", label: "Eastern Time (US)" },
+  { value: "America/Sao_Paulo", label: "São Paulo" },
+  { value: "Europe/London", label: "London (UK)" },
+  { value: "Europe/Paris", label: "Central Europe" },
+  { value: "Europe/Istanbul", label: "Istanbul" },
+  { value: "Asia/Dubai", label: "Dubai" },
+  { value: "Asia/Kolkata", label: "India" },
+  { value: "Asia/Singapore", label: "Singapore" },
+  { value: "Asia/Hong_Kong", label: "Hong Kong" },
+  { value: "Asia/Shanghai", label: "China" },
+  { value: "Asia/Tokyo", label: "Tokyo" },
+  { value: "Asia/Seoul", label: "Seoul" },
+  { value: "Australia/Sydney", label: "Sydney" },
+  { value: "Pacific/Auckland", label: "Auckland" },
+] as const;
+
+export const MEMBER_COLORS = [
+  "#0F766E",
+  "#B45309",
+  "#1D4ED8",
+  "#BE123C",
+  "#7C3AED",
+  "#047857",
+  "#C2410C",
+  "#0369A1",
+] as const;
