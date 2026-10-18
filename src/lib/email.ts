@@ -80,7 +80,7 @@ export async function sendEmail({ to, subject, html, text }: SendArgs) {
       data: {
         to,
         subject,
-        body: html,
+        body: `FAILED: ${message}\n\n${html}`,
         status: "FAILED",
       },
     });

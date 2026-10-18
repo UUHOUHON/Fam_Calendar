@@ -248,8 +248,8 @@ export default function AdminPage() {
               Email outbox
             </h2>
             <p className="mt-1 text-sm text-[var(--muted)]">
-              Without SMTP credentials, emails are sent through Ethereal test
-              inboxes. Open the preview link to read the message.
+              Signup, invite, and approval emails are sent through Brevo. A
+              FAILED row means Brevo rejected the message.
             </p>
             <ul className="mt-4 space-y-2">
               {emails.length === 0 && (

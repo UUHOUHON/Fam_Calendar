@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { AuthShell } from "@/components/AuthShell";
+import { bindTabUser } from "@/lib/tab-session";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -20,10 +21,12 @@ export default function LoginPage() {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        cache: "no-store",
         body: JSON.stringify({ email, password }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Login failed");
+      bindTabUser(data.member.id);
       router.push(data.member.status === "PENDING" ? "/pending" : "/");
       router.refresh();
     } catch (err) {
@@ -69,6 +72,10 @@ export default function LoginPage() {
         </button>
       </form>
       <p className="mt-4 text-sm text-[var(--muted)]">
+        Two people need two browsers, or one normal window and one private
+        window. Tabs in the same browser share a single login.
+      </p>
+      <p className="mt-2 text-sm text-[var(--muted)]">
         New here?{" "}
         <Link href="/signup" className="font-medium text-[var(--accent)]">
           Sign up with email

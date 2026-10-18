@@ -83,7 +83,7 @@ export async function POST(request: Request) {
     });
   }
 
-  await sendEmail({
+  const welcome = await sendEmail({
     to: email,
     subject: isFirst
       ? `Welcome to ${family.name}`
@@ -119,5 +119,7 @@ export async function POST(request: Request) {
       role: member.role,
       status: member.status,
     },
+    emailSent: welcome.ok,
+    emailError: welcome.ok ? undefined : welcome.error,
   });
 }

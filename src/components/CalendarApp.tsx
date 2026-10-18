@@ -26,6 +26,7 @@ import {
   utcToZonedParts,
 } from "@/lib/datetime";
 import type { ActivityDTO, FamilyBundle, MemberDTO } from "@/lib/types";
+import { bindTabUser, clearTabUser, tabUserId } from "@/lib/tab-session";
 import { ActivityForm } from "./ActivityForm";
 import { AvailabilityPanel } from "./AvailabilityPanel";
 import { ProfileForm } from "./ProfileForm";
@@ -42,23 +43,32 @@ export function CalendarApp() {
   const [showProfile, setShowProfile] = useState(false);
   const [editing, setEditing] = useState<ActivityDTO | null>(null);
   const [ready, setReady] = useState(false);
+  const [otherAccount, setOtherAccount] = useState<string | null>(null);
 
   async function load(opts?: { silent?: boolean }) {
     if (!opts?.silent) setLoading(true);
     setError(null);
     try {
-      const meRes = await fetch("/api/auth/me");
+      const meRes = await fetch("/api/auth/me", { cache: "no-store" });
       const meJson = await meRes.json();
       if (!meJson.user) {
+        clearTabUser();
         router.replace("/login");
         return;
       }
+      const bound = tabUserId();
+      if (bound && bound !== meJson.user.id) {
+        setOtherAccount(meJson.user.email);
+        return;
+      }
+      if (!bound) bindTabUser(meJson.user.id);
+      setOtherAccount(null);
       if (meJson.user.status === "PENDING") {
         router.replace("/pending");
         return;
       }
 
-      const res = await fetch("/api/family");
+      const res = await fetch("/api/family", { cache: "no-store" });
       if (res.status === 401) {
         router.replace("/login");
         return;
@@ -170,13 +180,49 @@ export function CalendarApp() {
   }
 
   async function logout() {
+    clearTabUser();
     await fetch("/api/auth/logout", { method: "POST" });
     router.push("/login");
+  }
+
+  function continueAsBrowserAccount() {
+    clearTabUser();
+    setOtherAccount(null);
+    void load();
   }
 
   function toggleMember(id: string) {
     setVisibleMembers((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+  }
+
+  if (otherAccount) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-3 px-6 text-center">
+        <p className="max-w-md text-[var(--ink)]">
+          This tab was signed in as someone else. This browser is now signed in
+          as <strong>{otherAccount}</strong>. Tabs in the same browser share one
+          login.
+        </p>
+        <p className="max-w-md text-sm text-[var(--muted)]">
+          To use two accounts at once, open a private window or another device.
+        </p>
+        <div className="flex gap-2">
+          <button
+            onClick={continueAsBrowserAccount}
+            className="rounded-xl bg-[var(--accent)] px-4 py-2 text-sm text-white"
+          >
+            Continue as {otherAccount}
+          </button>
+          <button
+            onClick={() => void logout()}
+            className="rounded-xl px-4 py-2 text-sm text-[var(--muted)] hover:bg-black/5"
+          >
+            Sign out
+          </button>
+        </div>
+      </div>
     );
   }
 

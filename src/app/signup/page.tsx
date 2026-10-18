@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { AuthShell } from "@/components/AuthShell";
+import { bindTabUser } from "@/lib/tab-session";
 import { COMMON_TIMEZONES } from "@/lib/timezones";
 
 function SignupForm() {
@@ -61,6 +62,15 @@ function SignupForm() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Signup failed");
+      bindTabUser(data.member.id);
+      if (data.emailSent === false) {
+        sessionStorage.setItem(
+          "fam_mail_error",
+          data.emailError || "Confirmation email could not be sent.",
+        );
+      } else {
+        sessionStorage.removeItem("fam_mail_error");
+      }
       router.push(data.member.status === "PENDING" ? "/pending" : "/");
       router.refresh();
     } catch (err) {
