@@ -22,6 +22,12 @@ After seeding:
 
 ## Setup
 
+1. Copy `.env.example` to `.env` and set:
+   - `DATABASE_URL` — PostgreSQL connection string (Prisma Postgres, Neon, etc.)
+   - `AUTH_SECRET` — long random string
+   - `APP_BASE_URL` / `NEXT_PUBLIC_APP_URL` — your site URL
+2. Install and initialize:
+
 ```bash
 npm install
 npx prisma db push
@@ -32,6 +38,10 @@ npm run dev
 Open [http://localhost:3000](http://localhost:3000).
 
 Admin: [http://localhost:3000/admin](http://localhost:3000/admin)
+
+## Deploy
+
+Push to GitHub, then deploy on Vercel. Set the same env vars in the Vercel project. The build runs `prisma db push` so the schema is applied automatically.
 
 ## Emails
 
