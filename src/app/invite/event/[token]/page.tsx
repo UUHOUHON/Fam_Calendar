@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { AuthShell } from "@/components/AuthShell";
 
 type InvitePayload = {
@@ -14,7 +14,7 @@ type InvitePayload = {
   error?: string;
 };
 
-export default function EventInvitePage() {
+function EventInviteForm() {
   const { token } = useParams<{ token: string }>();
   const router = useRouter();
   const [data, setData] = useState<InvitePayload | null>(null);
@@ -136,5 +136,19 @@ export default function EventInvitePage() {
         Open calendar
       </Link>
     </AuthShell>
+  );
+}
+
+export default function EventInvitePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center text-[var(--muted)]">
+          Loading invitation…
+        </div>
+      }
+    >
+      <EventInviteForm />
+    </Suspense>
   );
 }
