@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import type { Transporter } from "nodemailer";
 import { prisma } from "./db";
 
 type SendArgs = {
@@ -8,7 +9,7 @@ type SendArgs = {
   text?: string;
 };
 
-let etherealTransporter: nodemailer.Transporter | null = null;
+let etherealTransporter: Transporter | null = null;
 
 async function getTransporter() {
   if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {

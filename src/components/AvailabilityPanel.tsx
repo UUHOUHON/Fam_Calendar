@@ -21,7 +21,7 @@ export function AvailabilityPanel({
   const [endDate, setEndDate] = useState(() =>
     format(addDays(new Date(`${defaultStart}T12:00:00`), 6), "yyyy-MM-dd"),
   );
-  const [days, setDays] = useState<DayRow[]>([]);
+  const [days, setDays] = useState<DayAvailability[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
