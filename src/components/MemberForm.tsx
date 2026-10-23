@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { apiFetch } from "@/lib/tab-session";
 import { COMMON_TIMEZONES, MEMBER_COLORS } from "@/lib/timezones";
 
 type Props = {
@@ -24,7 +25,7 @@ export function MemberForm({ onClose, onSaved }: Props) {
     setSaving(true);
     setError(null);
     try {
-      const res = await fetch("/api/family", {
+      const res = await apiFetch("/api/family", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, timezone, color }),

@@ -1,10 +1,10 @@
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { SignJWT, jwtVerify } from "jose";
 import bcrypt from "bcryptjs";
 import { prisma } from "./db";
 
-/** Bumped cookie name so old shared/cached sessions are dropped. */
+/** Legacy cookie — cleared so windows no longer share login. */
 export const SESSION_COOKIE = "fam_sid";
 
 const secret = () =>
@@ -55,26 +55,12 @@ export async function createSessionToken(user: SessionUser) {
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("30d")
-    .setJti(`${user.id}-${Date.now()}`)
+    .setJti(`${user.id}-${Date.now()}-${Math.random().toString(36).slice(2)}`)
     .sign(secret());
 }
 
-/** Attach session cookie to a Route Handler response (preferred). */
-export async function attachSession(
-  response: NextResponse,
-  user: SessionUser,
-) {
-  const token = await createSessionToken(user);
-  response.cookies.set(SESSION_COOKIE, token, sessionCookieOptions());
-  // Clear legacy cookie if present
-  response.cookies.set("fam_session", "", {
-    ...sessionCookieOptions(),
-    maxAge: 0,
-  });
-  return response;
-}
-
-export async function clearSessionOn(response: NextResponse) {
+/** Clear shared browser cookies so each window uses its own Bearer token. */
+export function clearSharedCookies(response: NextResponse) {
   response.cookies.set(SESSION_COOKIE, "", {
     ...sessionCookieOptions(),
     maxAge: 0,
@@ -86,11 +72,29 @@ export async function clearSessionOn(response: NextResponse) {
   return response;
 }
 
-/** @deprecated Prefer attachSession on the response. */
-export async function createSession(user: SessionUser) {
+export async function issueSession(user: SessionUser) {
+  return createSessionToken(user);
+}
+
+/** @deprecated Prefer issueSession + token in JSON. */
+export async function attachSession(
+  response: NextResponse,
+  user: SessionUser,
+) {
   const token = await createSessionToken(user);
+  clearSharedCookies(response);
+  response.headers.set("X-Fam-Token", token);
+  return response;
+}
+
+export async function clearSessionOn(response: NextResponse) {
+  return clearSharedCookies(response);
+}
+
+export async function createSession(user: SessionUser) {
+  void user;
   const jar = await cookies();
-  jar.set(SESSION_COOKIE, token, sessionCookieOptions());
+  jar.set(SESSION_COOKIE, "", { ...sessionCookieOptions(), maxAge: 0 });
   jar.set("fam_session", "", { ...sessionCookieOptions(), maxAge: 0 });
 }
 
@@ -100,12 +104,7 @@ export async function clearSession() {
   jar.set("fam_session", "", { ...sessionCookieOptions(), maxAge: 0 });
 }
 
-export async function getSession(): Promise<SessionUser | null> {
-  const jar = await cookies();
-  const token =
-    jar.get(SESSION_COOKIE)?.value || jar.get("fam_session")?.value;
-  if (!token) return null;
-
+async function memberFromToken(token: string): Promise<SessionUser | null> {
   try {
     const { payload } = await jwtVerify(token, secret());
     const id = String(payload.id || "");
@@ -127,6 +126,25 @@ export async function getSession(): Promise<SessionUser | null> {
   } catch {
     return null;
   }
+}
+
+export async function getSession(): Promise<SessionUser | null> {
+  const h = await headers();
+  const auth = h.get("authorization");
+  if (auth?.toLowerCase().startsWith("bearer ")) {
+    const token = auth.slice(7).trim();
+    if (token) {
+      const fromBearer = await memberFromToken(token);
+      if (fromBearer) return fromBearer;
+    }
+  }
+
+  // Cookie fallback only if no Bearer (older tabs); prefer Bearer for isolation.
+  const jar = await cookies();
+  const cookieToken =
+    jar.get(SESSION_COOKIE)?.value || jar.get("fam_session")?.value;
+  if (!cookieToken) return null;
+  return memberFromToken(cookieToken);
 }
 
 export async function requireSession() {
@@ -184,7 +202,7 @@ export function noStoreJson(data: unknown, init?: { status?: number }) {
     status: init?.status ?? 200,
     headers: {
       "Cache-Control": "private, no-store, max-age=0, must-revalidate",
-      Vary: "Cookie",
+      Vary: "Authorization, Cookie",
     },
   });
 }

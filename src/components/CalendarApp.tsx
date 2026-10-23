@@ -26,7 +26,12 @@ import {
   utcToZonedParts,
 } from "@/lib/datetime";
 import type { ActivityDTO, FamilyBundle, MemberDTO } from "@/lib/types";
-import { bindTabUser, clearTabUser, tabUserId } from "@/lib/tab-session";
+import {
+  apiFetch,
+  bindTabUser,
+  clearTabSession,
+  getTabToken,
+} from "@/lib/tab-session";
 import { ActivityForm } from "./ActivityForm";
 import { AvailabilityPanel } from "./AvailabilityPanel";
 import { ProfileForm } from "./ProfileForm";
@@ -43,39 +48,31 @@ export function CalendarApp() {
   const [showProfile, setShowProfile] = useState(false);
   const [editing, setEditing] = useState<ActivityDTO | null>(null);
   const [ready, setReady] = useState(false);
-  const [otherAccount, setOtherAccount] = useState<string | null>(null);
 
   async function load(opts?: { silent?: boolean }) {
     if (!opts?.silent) setLoading(true);
     setError(null);
     try {
-      const meRes = await fetch("/api/auth/me", {
-        cache: "no-store",
-        credentials: "same-origin",
-      });
-      const meJson = await meRes.json();
-      if (!meJson.user) {
-        clearTabUser();
+      if (!getTabToken()) {
         router.replace("/login");
         return;
       }
-      const bound = tabUserId();
-      if (bound && bound !== meJson.user.id) {
-        setOtherAccount(meJson.user.email);
+      const meRes = await apiFetch("/api/auth/me");
+      const meJson = await meRes.json();
+      if (!meJson.user) {
+        clearTabSession();
+        router.replace("/login");
         return;
       }
-      if (!bound) bindTabUser(meJson.user.id);
-      setOtherAccount(null);
+      bindTabUser(meJson.user.id);
       if (meJson.user.status === "PENDING") {
         router.replace("/pending");
         return;
       }
 
-      const res = await fetch("/api/family", {
-        cache: "no-store",
-        credentials: "same-origin",
-      });
+      const res = await apiFetch("/api/family");
       if (res.status === 401) {
+        clearTabSession();
         router.replace("/login");
         return;
       }
@@ -181,58 +178,19 @@ export function CalendarApp() {
 
   async function deleteActivity(id: string) {
     if (!confirm("Delete this activity?")) return;
-    await fetch(`/api/activities/${id}`, { method: "DELETE" });
+    await apiFetch(`/api/activities/${id}`, { method: "DELETE" });
     await load();
   }
 
   async function logout() {
-    clearTabUser();
-    await fetch("/api/auth/logout", {
-      method: "POST",
-      credentials: "same-origin",
-      cache: "no-store",
-    });
+    clearTabSession();
+    await apiFetch("/api/auth/logout", { method: "POST" });
     router.push("/login");
-  }
-
-  function continueAsBrowserAccount() {
-    clearTabUser();
-    setOtherAccount(null);
-    void load();
   }
 
   function toggleMember(id: string) {
     setVisibleMembers((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
-    );
-  }
-
-  if (otherAccount) {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-3 px-6 text-center">
-        <p className="max-w-md text-[var(--ink)]">
-          This tab was using a different account. This browser is now signed in
-          as <strong>{otherAccount}</strong>.
-        </p>
-        <p className="max-w-md text-sm text-[var(--muted)]">
-          Two windows of the same browser share one login. For a second person,
-          open a private/incognito window or another browser.
-        </p>
-        <div className="flex gap-2">
-          <button
-            onClick={continueAsBrowserAccount}
-            className="rounded-xl bg-[var(--accent)] px-4 py-2 text-sm text-white"
-          >
-            Continue as {otherAccount}
-          </button>
-          <button
-            onClick={() => void logout()}
-            className="rounded-xl px-4 py-2 text-sm text-[var(--muted)] hover:bg-black/5"
-          >
-            Sign out
-          </button>
-        </div>
-      </div>
     );
   }
 

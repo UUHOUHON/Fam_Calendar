@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { AuthShell } from "@/components/AuthShell";
+import { apiFetch } from "@/lib/tab-session";
 
 type InvitePayload = {
   invite: { status: string; memberEmail: string };
@@ -22,7 +23,7 @@ function EventInviteForm() {
   const [working, setWorking] = useState(false);
 
   async function load() {
-    const res = await fetch(`/api/event-invites/${token}`);
+    const res = await apiFetch(`/api/event-invites/${token}`);
     const json = await res.json();
     if (!res.ok) {
       setError(json.error || "Invitation not found");
@@ -39,7 +40,7 @@ function EventInviteForm() {
     setWorking(true);
     setError(null);
     try {
-      const res = await fetch(`/api/event-invites/${token}`, {
+      const res = await apiFetch(`/api/event-invites/${token}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action }),

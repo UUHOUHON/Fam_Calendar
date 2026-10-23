@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { MemberDTO } from "@/lib/types";
+import { apiFetch, setTabToken } from "@/lib/tab-session";
 import { COMMON_TIMEZONES } from "@/lib/timezones";
 
 type Props = {
@@ -21,13 +22,14 @@ export function ProfileForm({ me, onClose, onSaved }: Props) {
     setSaving(true);
     setError(null);
     try {
-      const res = await fetch("/api/profile", {
+      const res = await apiFetch("/api/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, timezone }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not update profile");
+      if (data.token) setTabToken(data.token);
       onSaved();
       onClose();
     } catch (err) {

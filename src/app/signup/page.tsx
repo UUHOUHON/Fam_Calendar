@@ -4,7 +4,12 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { AuthShell } from "@/components/AuthShell";
-import { bindTabUser } from "@/lib/tab-session";
+import {
+  apiFetch,
+  bindTabUser,
+  clearTabSession,
+  setTabToken,
+} from "@/lib/tab-session";
 import { COMMON_TIMEZONES } from "@/lib/timezones";
 
 function SignupForm() {
@@ -49,7 +54,7 @@ function SignupForm() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/auth/signup", {
+      const res = await apiFetch("/api/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -62,6 +67,9 @@ function SignupForm() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Signup failed");
+      if (!data.token) throw new Error("Signup did not return a session token");
+      clearTabSession();
+      setTabToken(data.token);
       bindTabUser(data.member.id);
       if (data.emailSent === false) {
         sessionStorage.setItem(

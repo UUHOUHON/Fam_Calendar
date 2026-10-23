@@ -1,7 +1,8 @@
 import { z } from "zod";
 import {
-  attachSession,
+  clearSharedCookies,
   hashPassword,
+  issueSession,
   noStoreJson,
   toSessionUser,
 } from "@/lib/auth";
@@ -109,6 +110,7 @@ export async function POST(request: Request) {
     );
   }
 
+  const token = await issueSession(toSessionUser(member));
   const response = noStoreJson({
     member: {
       id: member.id,
@@ -117,8 +119,9 @@ export async function POST(request: Request) {
       role: member.role,
       status: member.status,
     },
+    token,
     emailSent: welcome.ok,
     emailError: welcome.ok ? undefined : welcome.error,
   });
-  return attachSession(response, toSessionUser(member));
+  return clearSharedCookies(response);
 }

@@ -8,6 +8,7 @@ import type {
   FamilyInviteDTO,
   MemberDTO,
 } from "@/lib/types";
+import { apiFetch, getTabToken } from "@/lib/tab-session";
 
 export default function AdminPage() {
   const router = useRouter();
@@ -23,7 +24,11 @@ export default function AdminPage() {
     setLoading(true);
     setError(null);
     try {
-      const meRes = await fetch("/api/auth/me");
+      if (!getTabToken()) {
+        router.replace("/login");
+        return;
+      }
+      const meRes = await apiFetch("/api/auth/me");
       const me = await meRes.json();
       if (!me.user) {
         router.replace("/login");
@@ -35,9 +40,9 @@ export default function AdminPage() {
       }
 
       const [membersRes, invitesRes, emailsRes] = await Promise.all([
-        fetch("/api/admin/members"),
-        fetch("/api/admin/invites"),
-        fetch("/api/admin/emails"),
+        apiFetch("/api/admin/members"),
+        apiFetch("/api/admin/invites"),
+        apiFetch("/api/admin/emails"),
       ]);
 
       if (!membersRes.ok || !invitesRes.ok || !emailsRes.ok) {
@@ -65,7 +70,7 @@ export default function AdminPage() {
     e.preventDefault();
     setMessage(null);
     setError(null);
-    const res = await fetch("/api/admin/invites", {
+    const res = await apiFetch("/api/admin/invites", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email: inviteEmail }),
@@ -87,7 +92,7 @@ export default function AdminPage() {
   async function reviewMember(id: string, action: "accept" | "reject") {
     setMessage(null);
     setError(null);
-    const res = await fetch(`/api/admin/members/${id}`, {
+    const res = await apiFetch(`/api/admin/members/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action }),

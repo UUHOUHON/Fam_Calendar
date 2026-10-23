@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
-  attachSession,
+  clearSharedCookies,
+  issueSession,
   noStoreJson,
   requireSession,
   toSessionUser,
@@ -22,7 +23,6 @@ export async function PATCH(request: Request) {
 
     if (body.timezone) {
       const known = COMMON_TIMEZONES.some((t) => t.value === body.timezone);
-      // Allow any IANA string; known list is just UI convenience
       if (!body.timezone.includes("/")) {
         return noStoreJson({ error: "Invalid timezone" }, { status: 400 });
       }
@@ -38,8 +38,12 @@ export async function PATCH(request: Request) {
       },
     });
 
-    const response = noStoreJson({ member: serializeMember(member) });
-    return attachSession(response, toSessionUser(member));
+    const token = await issueSession(toSessionUser(member));
+    const response = noStoreJson({
+      member: serializeMember(member),
+      token,
+    });
+    return clearSharedCookies(response);
   } catch (error) {
     if (error instanceof Response) return error;
     throw error;

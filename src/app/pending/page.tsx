@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AuthShell } from "@/components/AuthShell";
-import { clearTabUser } from "@/lib/tab-session";
+import { apiFetch, clearTabSession, getTabToken } from "@/lib/tab-session";
 
 export default function PendingPage() {
   const router = useRouter();
@@ -13,10 +13,15 @@ export default function PendingPage() {
 
   useEffect(() => {
     setMailError(sessionStorage.getItem("fam_mail_error"));
-    void fetch("/api/auth/me", { cache: "no-store" })
+    if (!getTabToken()) {
+      router.replace("/login");
+      return;
+    }
+    void apiFetch("/api/auth/me")
       .then((r) => r.json())
       .then((data) => {
         if (!data.user) {
+          clearTabSession();
           router.replace("/login");
           return;
         }
@@ -29,8 +34,8 @@ export default function PendingPage() {
   }, [router]);
 
   async function logout() {
-    clearTabUser();
-    await fetch("/api/auth/logout", { method: "POST" });
+    clearTabSession();
+    await apiFetch("/api/auth/logout", { method: "POST" });
     router.push("/login");
   }
 

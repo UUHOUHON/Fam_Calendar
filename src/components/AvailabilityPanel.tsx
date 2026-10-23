@@ -5,6 +5,7 @@ import { addDays, format } from "date-fns";
 import { utcToZonedParts } from "@/lib/datetime";
 import type { DayAvailability } from "@/lib/availability";
 import type { MemberDTO } from "@/lib/types";
+import { apiFetch } from "@/lib/tab-session";
 
 type Props = {
   members: MemberDTO[];
@@ -34,7 +35,7 @@ export function AvailabilityPanel({
     if (!opts?.silent) setLoading(true);
     setError(null);
     try {
-      const res = await fetch(
+      const res = await apiFetch(
         `/api/availability?start=${startDate}&end=${endDate}`,
       );
       const data = await res.json();

@@ -4,7 +4,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AuthShell } from "@/components/AuthShell";
-import { bindTabUser, clearTabUser } from "@/lib/tab-session";
+import {
+  apiFetch,
+  bindTabUser,
+  clearTabSession,
+  getTabToken,
+  setTabToken,
+} from "@/lib/tab-session";
 
 type CurrentUser = {
   id: string;
@@ -22,10 +28,8 @@ export default function LoginPage() {
   const [current, setCurrent] = useState<CurrentUser | null>(null);
 
   useEffect(() => {
-    void fetch("/api/auth/me", {
-      cache: "no-store",
-      credentials: "same-origin",
-    })
+    if (!getTabToken()) return;
+    void apiFetch("/api/auth/me")
       .then((r) => r.json())
       .then((data) => {
         if (data.user) setCurrent(data.user);
@@ -38,16 +42,16 @@ export default function LoginPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/auth/login", {
+      const res = await apiFetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        cache: "no-store",
-        credentials: "same-origin",
         body: JSON.stringify({ email, password }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Login failed");
-      clearTabUser();
+      if (!data.token) throw new Error("Login did not return a session token");
+      clearTabSession();
+      setTabToken(data.token);
       bindTabUser(data.member.id);
       router.push(data.member.status === "PENDING" ? "/pending" : "/");
       router.refresh();
@@ -59,12 +63,8 @@ export default function LoginPage() {
   }
 
   async function signOut() {
-    clearTabUser();
-    await fetch("/api/auth/logout", {
-      method: "POST",
-      credentials: "same-origin",
-      cache: "no-store",
-    });
+    clearTabSession();
+    await apiFetch("/api/auth/logout", { method: "POST" });
     setCurrent(null);
   }
 
@@ -75,8 +75,7 @@ export default function LoginPage() {
     >
       {current && (
         <div className="mb-4 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-950">
-          This browser is already signed in as <strong>{current.email}</strong>.
-          Sign out first to switch accounts, or continue to the calendar.
+          This window is already signed in as <strong>{current.email}</strong>.
           <div className="mt-2 flex gap-2">
             <button
               type="button"
@@ -131,8 +130,8 @@ export default function LoginPage() {
         </button>
       </form>
       <p className="mt-4 text-sm text-[var(--muted)]">
-        Each browser keeps its own login. Two Chrome windows share one account;
-        use a private window (or another browser/phone) for a second person.
+        Each browser window keeps its own login. Open a second window, go to
+        Sign in, and log in as another family member.
       </p>
       <p className="mt-2 text-sm text-[var(--muted)]">
         New here?{" "}

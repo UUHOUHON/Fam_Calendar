@@ -8,6 +8,7 @@ import {
   proposedRangeUtc,
 } from "@/lib/availability";
 import type { ActivityDTO, MemberDTO } from "@/lib/types";
+import { apiFetch } from "@/lib/tab-session";
 import { COMMON_TIMEZONES } from "@/lib/timezones";
 
 type Props = {
@@ -68,7 +69,7 @@ export function ActivityForm({
 
   useEffect(() => {
     // Load full busy data so conflicts include activities not yet visible on calendar
-    void fetch(`/api/availability?start=${date}&end=${date}`)
+    void apiFetch(`/api/availability?start=${date}&end=${date}`)
       .then((r) => r.json())
       .then((data) => {
         if (data.activities) setAllActivities(data.activities);
@@ -142,7 +143,7 @@ export function ActivityForm({
     };
 
     try {
-      const res = await fetch(
+      const res = await apiFetch(
         initial ? `/api/activities/${initial.id}` : "/api/activities",
         {
           method: initial ? "PATCH" : "POST",

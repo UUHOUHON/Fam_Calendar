@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
-  attachSession,
+  clearSharedCookies,
+  issueSession,
   noStoreJson,
   toSessionUser,
   verifyPassword,
@@ -29,6 +30,7 @@ export async function POST(request: Request) {
     );
   }
 
+  const token = await issueSession(toSessionUser(member));
   const response = noStoreJson({
     member: {
       id: member.id,
@@ -37,6 +39,7 @@ export async function POST(request: Request) {
       role: member.role,
       status: member.status,
     },
+    token,
   });
-  return attachSession(response, toSessionUser(member));
+  return clearSharedCookies(response);
 }
