@@ -31,6 +31,7 @@ export default function AdminPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [lastInviteLink, setLastInviteLink] = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
@@ -94,12 +95,32 @@ export default function AdminPage() {
       return;
     }
     setInviteEmail("");
-    setMessage(
-      data.email?.previewUrl
-        ? `Invite emailed. Preview: ${data.email.previewUrl}`
-        : `Invite sent to ${data.invite.email}`,
-    );
+    const absoluteLink =
+      data.invite?.link?.startsWith("http")
+        ? data.invite.link
+        : `${window.location.origin}/signup?invite=${data.invite.token}`;
+    setLastInviteLink(absoluteLink);
+
+    if (data.email?.ok) {
+      setMessage(`Invite emailed to ${data.invite.email}.`);
+    } else {
+      setError(
+        `Invite created for ${data.invite.email}, but email was not sent${
+          data.email?.error ? ` (${data.email.error})` : ""
+        }. Copy the invite link below and share it manually.`,
+      );
+    }
     await load();
+  }
+
+  async function copyInviteLink(link: string) {
+    try {
+      await navigator.clipboard.writeText(link);
+      setMessage("Invite link copied.");
+      setError(null);
+    } catch {
+      setError("Could not copy automatically — select the link and copy it.");
+    }
   }
 
   async function reviewMember(id: string, action: "accept" | "reject") {
@@ -285,29 +306,58 @@ export default function AdminPage() {
               </button>
             </form>
 
+            {lastInviteLink && (
+              <div className="mt-3 rounded-2xl bg-amber-50 px-3 py-2 text-sm text-amber-950">
+                <div className="font-medium">Latest invite link</div>
+                <p className="mt-1 break-all text-xs">{lastInviteLink}</p>
+                <button
+                  type="button"
+                  onClick={() => void copyInviteLink(lastInviteLink)}
+                  className="mt-2 rounded-lg bg-[var(--accent)] px-2.5 py-1 text-xs text-white"
+                >
+                  Copy link
+                </button>
+              </div>
+            )}
+
             <ul className="mt-4 space-y-2">
               {invites.length === 0 && (
                 <li className="text-sm text-[var(--muted)]">No invites yet.</li>
               )}
-              {invites.map((invite) => (
-                <li
-                  key={invite.id}
-                  className="rounded-2xl bg-black/[0.03] px-3 py-2 text-sm"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-medium">{invite.email}</span>
-                    <span className="text-xs uppercase tracking-wide text-[var(--muted)]">
-                      {invite.status}
-                    </span>
-                  </div>
-                  <a
-                    href={`/signup?invite=${invite.token}`}
-                    className="mt-1 block truncate text-xs text-[var(--accent)]"
+              {invites.map((invite) => {
+                const link =
+                  typeof window !== "undefined"
+                    ? `${window.location.origin}/signup?invite=${invite.token}`
+                    : invite.link;
+                return (
+                  <li
+                    key={invite.id}
+                    className="rounded-2xl bg-black/[0.03] px-3 py-2 text-sm"
                   >
-                    /signup?invite={invite.token}
-                  </a>
-                </li>
-              ))}
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-medium">{invite.email}</span>
+                      <span className="text-xs uppercase tracking-wide text-[var(--muted)]">
+                        {invite.status}
+                      </span>
+                    </div>
+                    <div className="mt-1 flex flex-wrap items-center gap-2">
+                      <a
+                        href={link}
+                        className="block min-w-0 flex-1 truncate text-xs text-[var(--accent)]"
+                      >
+                        {link}
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => void copyInviteLink(link)}
+                        className="rounded-lg bg-white px-2 py-0.5 text-xs ring-1 ring-black/10"
+                      >
+                        Copy
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           </section>
 
