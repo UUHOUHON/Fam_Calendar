@@ -325,10 +325,7 @@ export default function AdminPage() {
                 <li className="text-sm text-[var(--muted)]">No invites yet.</li>
               )}
               {invites.map((invite) => {
-                const link =
-                  typeof window !== "undefined"
-                    ? `${window.location.origin}/signup?invite=${invite.token}`
-                    : invite.link;
+                const link = `${window.location.origin}/signup?invite=${invite.token}`;
                 return (
                   <li
                     key={invite.id}
