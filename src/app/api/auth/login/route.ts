@@ -1,7 +1,7 @@
-import { NextResponse } from "next/server";
 import { z } from "zod";
 import {
-  createSession,
+  attachSession,
+  noStoreJson,
   toSessionUser,
   verifyPassword,
 } from "@/lib/auth";
@@ -19,22 +19,17 @@ export async function POST(request: Request) {
   });
 
   if (!member || !(await verifyPassword(body.password, member.passwordHash))) {
-    return NextResponse.json(
-      { error: "Invalid email or password" },
-      { status: 401 },
-    );
+    return noStoreJson({ error: "Invalid email or password" }, { status: 401 });
   }
 
   if (member.status === "REJECTED") {
-    return NextResponse.json(
+    return noStoreJson(
       { error: "Your membership was rejected. Contact a family admin." },
       { status: 403 },
     );
   }
 
-  await createSession(toSessionUser(member));
-
-  return NextResponse.json({
+  const response = noStoreJson({
     member: {
       id: member.id,
       name: member.name,
@@ -43,4 +38,5 @@ export async function POST(request: Request) {
       status: member.status,
     },
   });
+  return attachSession(response, toSessionUser(member));
 }

@@ -1,7 +1,7 @@
-import { NextResponse } from "next/server";
 import { z } from "zod";
 import {
-  createSession,
+  attachSession,
+  noStoreJson,
   requireSession,
   toSessionUser,
 } from "@/lib/auth";
@@ -24,7 +24,7 @@ export async function PATCH(request: Request) {
       const known = COMMON_TIMEZONES.some((t) => t.value === body.timezone);
       // Allow any IANA string; known list is just UI convenience
       if (!body.timezone.includes("/")) {
-        return NextResponse.json({ error: "Invalid timezone" }, { status: 400 });
+        return noStoreJson({ error: "Invalid timezone" }, { status: 400 });
       }
       void known;
     }
@@ -38,9 +38,8 @@ export async function PATCH(request: Request) {
       },
     });
 
-    await createSession(toSessionUser(member));
-
-    return NextResponse.json({ member: serializeMember(member) });
+    const response = noStoreJson({ member: serializeMember(member) });
+    return attachSession(response, toSessionUser(member));
   } catch (error) {
     if (error instanceof Response) return error;
     throw error;

@@ -1,7 +1,6 @@
-import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
+import { getSession, noStoreJson } from "@/lib/auth";
 
 export async function GET() {
   const session = await getSession();
-  return NextResponse.json({ user: session });
+  return noStoreJson({ user: session });
 }

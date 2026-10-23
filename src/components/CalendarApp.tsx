@@ -49,7 +49,10 @@ export function CalendarApp() {
     if (!opts?.silent) setLoading(true);
     setError(null);
     try {
-      const meRes = await fetch("/api/auth/me", { cache: "no-store" });
+      const meRes = await fetch("/api/auth/me", {
+        cache: "no-store",
+        credentials: "same-origin",
+      });
       const meJson = await meRes.json();
       if (!meJson.user) {
         clearTabUser();
@@ -68,7 +71,10 @@ export function CalendarApp() {
         return;
       }
 
-      const res = await fetch("/api/family", { cache: "no-store" });
+      const res = await fetch("/api/family", {
+        cache: "no-store",
+        credentials: "same-origin",
+      });
       if (res.status === 401) {
         router.replace("/login");
         return;
@@ -181,7 +187,11 @@ export function CalendarApp() {
 
   async function logout() {
     clearTabUser();
-    await fetch("/api/auth/logout", { method: "POST" });
+    await fetch("/api/auth/logout", {
+      method: "POST",
+      credentials: "same-origin",
+      cache: "no-store",
+    });
     router.push("/login");
   }
 
@@ -201,12 +211,12 @@ export function CalendarApp() {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-3 px-6 text-center">
         <p className="max-w-md text-[var(--ink)]">
-          This tab was signed in as someone else. This browser is now signed in
-          as <strong>{otherAccount}</strong>. Tabs in the same browser share one
-          login.
+          This tab was using a different account. This browser is now signed in
+          as <strong>{otherAccount}</strong>.
         </p>
         <p className="max-w-md text-sm text-[var(--muted)]">
-          To use two accounts at once, open a private window or another device.
+          Two windows of the same browser share one login. For a second person,
+          open a private/incognito window or another browser.
         </p>
         <div className="flex gap-2">
           <button

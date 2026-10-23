@@ -1,8 +1,8 @@
-import { NextResponse } from "next/server";
 import { z } from "zod";
 import {
-  createSession,
+  attachSession,
   hashPassword,
+  noStoreJson,
   toSessionUser,
 } from "@/lib/auth";
 import { prisma } from "@/lib/db";
@@ -27,7 +27,7 @@ export async function POST(request: Request) {
 
   const existing = await prisma.member.findUnique({ where: { email } });
   if (existing) {
-    return NextResponse.json(
+    return noStoreJson(
       { error: "An account with this email already exists" },
       { status: 400 },
     );
@@ -51,7 +51,7 @@ export async function POST(request: Request) {
       invite.expiresAt < new Date() ||
       invite.email.toLowerCase() !== email
     ) {
-      return NextResponse.json(
+      return noStoreJson(
         { error: "Invite is invalid, expired, or email does not match" },
         { status: 400 },
       );
@@ -109,9 +109,7 @@ export async function POST(request: Request) {
     );
   }
 
-  await createSession(toSessionUser(member));
-
-  return NextResponse.json({
+  const response = noStoreJson({
     member: {
       id: member.id,
       name: member.name,
@@ -122,4 +120,5 @@ export async function POST(request: Request) {
     emailSent: welcome.ok,
     emailError: welcome.ok ? undefined : welcome.error,
   });
+  return attachSession(response, toSessionUser(member));
 }
