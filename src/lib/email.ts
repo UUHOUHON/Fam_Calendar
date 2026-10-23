@@ -11,6 +11,59 @@ type SendArgs = {
 
 let etherealTransporter: Transporter | null = null;
 
+function fromAddress() {
+  return (
+    process.env.SMTP_FROM ||
+    '"The Family Calendar" <noreply@fam-calendar.local>'
+  );
+}
+
+function parseFrom(from: string): { name?: string; email: string } {
+  const match = from.match(/^\s*"?([^"<]*)"?\s*<([^>]+)>\s*$/);
+  if (match) {
+    return { name: match[1].trim() || undefined, email: match[2].trim() };
+  }
+  return { email: from.trim() };
+}
+
+async function sendViaBrevoApi({ to, subject, html, text }: SendArgs) {
+  const apiKey = process.env.BREVO_API_KEY;
+  if (!apiKey) return null;
+
+  const from = parseFrom(fromAddress());
+  const res = await fetch("https://api.brevo.com/v3/smtp/email", {
+    method: "POST",
+    headers: {
+      accept: "application/json",
+      "content-type": "application/json",
+      "api-key": apiKey,
+    },
+    body: JSON.stringify({
+      sender: {
+        email: from.email,
+        ...(from.name ? { name: from.name } : {}),
+      },
+      to: [{ email: to }],
+      subject,
+      htmlContent: html,
+      textContent: text || html.replace(/<[^>]+>/g, " "),
+    }),
+  });
+
+  const body = (await res.json().catch(() => ({}))) as {
+    messageId?: string;
+    message?: string;
+  };
+
+  if (!res.ok) {
+    throw new Error(
+      body.message || `Brevo API error ${res.status}`,
+    );
+  }
+
+  return { messageId: body.messageId || null };
+}
+
 async function getTransporter() {
   if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
     return nodemailer.createTransport({
@@ -50,18 +103,21 @@ export function appBaseUrl() {
 
 export async function sendEmail({ to, subject, html, text }: SendArgs) {
   try {
-    const transporter = await getTransporter();
-    const info = await transporter.sendMail({
-      from:
-        process.env.SMTP_FROM ||
-        '"The Family Calendar" <noreply@fam-calendar.local>',
-      to,
-      subject,
-      html,
-      text: text || html.replace(/<[^>]+>/g, " "),
-    });
+    let previewUrl: string | null = null;
 
-    const previewUrl = nodemailer.getTestMessageUrl(info) || null;
+    if (process.env.BREVO_API_KEY) {
+      await sendViaBrevoApi({ to, subject, html, text });
+    } else {
+      const transporter = await getTransporter();
+      const info = await transporter.sendMail({
+        from: fromAddress(),
+        to,
+        subject,
+        html,
+        text: text || html.replace(/<[^>]+>/g, " "),
+      });
+      previewUrl = nodemailer.getTestMessageUrl(info) || null;
+    }
 
     await prisma.emailLog.create({
       data: {
