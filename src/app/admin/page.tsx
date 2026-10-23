@@ -10,8 +10,17 @@ import type {
 } from "@/lib/types";
 import { apiFetch, getTabToken } from "@/lib/tab-session";
 
+type Me = {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  status: string;
+};
+
 export default function AdminPage() {
   const router = useRouter();
+  const [me, setMe] = useState<Me | null>(null);
   const [members, setMembers] = useState<MemberDTO[]>([]);
   const [invites, setInvites] = useState<FamilyInviteDTO[]>([]);
   const [emails, setEmails] = useState<EmailLogDTO[]>([]);
@@ -19,6 +28,9 @@ export default function AdminPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
@@ -29,15 +41,16 @@ export default function AdminPage() {
         return;
       }
       const meRes = await apiFetch("/api/auth/me");
-      const me = await meRes.json();
-      if (!me.user) {
+      const meJson = await meRes.json();
+      if (!meJson.user) {
         router.replace("/login");
         return;
       }
-      if (me.user.role !== "ADMIN" || me.user.status !== "ACTIVE") {
+      if (meJson.user.role !== "ADMIN" || meJson.user.status !== "ACTIVE") {
         router.replace("/");
         return;
       }
+      setMe(meJson.user);
 
       const [membersRes, invitesRes, emailsRes] = await Promise.all([
         apiFetch("/api/admin/members"),
@@ -92,22 +105,119 @@ export default function AdminPage() {
   async function reviewMember(id: string, action: "accept" | "reject") {
     setMessage(null);
     setError(null);
-    const res = await apiFetch(`/api/admin/members/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      setError(data.error || "Update failed");
+    setBusyId(id);
+    try {
+      const res = await apiFetch(`/api/admin/members/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Update failed");
+        return;
+      }
+      setMessage(
+        action === "accept"
+          ? `${data.member.name} accepted — acceptance email sent.`
+          : `${data.member.name} rejected.`,
+      );
+      await load();
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  function startRename(member: MemberDTO) {
+    setEditingId(member.id);
+    setEditName(member.name);
+    setMessage(null);
+    setError(null);
+  }
+
+  async function saveRename(id: string) {
+    const name = editName.trim();
+    if (!name) {
+      setError("Name cannot be empty");
       return;
     }
-    setMessage(
-      action === "accept"
-        ? `${data.member.name} accepted — acceptance email sent.`
-        : `${data.member.name} rejected.`,
-    );
-    await load();
+    setBusyId(id);
+    setMessage(null);
+    setError(null);
+    try {
+      const res = await apiFetch(`/api/admin/members/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Could not rename member");
+        return;
+      }
+      setEditingId(null);
+      setMessage(`Renamed to ${data.member.name}.`);
+      await load();
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function setRole(id: string, role: "ADMIN" | "MEMBER") {
+    setBusyId(id);
+    setMessage(null);
+    setError(null);
+    try {
+      const res = await apiFetch(`/api/admin/members/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Could not update role");
+        return;
+      }
+      setMessage(
+        role === "ADMIN"
+          ? `${data.member.name} is now an admin.`
+          : `${data.member.name} is now a member.`,
+      );
+      await load();
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function removeMember(member: MemberDTO) {
+    if (member.id === me?.id) {
+      setError("You cannot remove your own account");
+      return;
+    }
+    if (
+      !confirm(
+        `Remove ${member.name} (${member.email}) from the family calendar? Their activities will be deleted.`,
+      )
+    ) {
+      return;
+    }
+    setBusyId(member.id);
+    setMessage(null);
+    setError(null);
+    try {
+      const res = await apiFetch(`/api/admin/members/${member.id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Could not remove member");
+        return;
+      }
+      setMessage(`${member.name} was removed.`);
+      await load();
+    } finally {
+      setBusyId(null);
+    }
   }
 
   if (loading) {
@@ -131,9 +241,8 @@ export default function AdminPage() {
               The Family Calendar — Admin
             </h1>
             <p className="mt-2 max-w-2xl text-sm text-[var(--muted)]">
-              Invite relatives by email, approve pending signups, and review
-              outbound emails (Ethereal preview links while SMTP is not
-              configured).
+              Invite relatives, approve signups, rename or remove members, and
+              review outbound emails.
             </p>
           </div>
           <Link
@@ -206,45 +315,140 @@ export default function AdminPage() {
             <h2 className="font-[family-name:var(--font-display)] text-xl">
               Pending & members
             </h2>
-            <ul className="mt-4 space-y-2">
-              {members.map((member) => (
-                <li
-                  key={member.id}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-black/[0.03] px-3 py-2 text-sm"
-                >
-                  <div>
-                    <div className="font-medium">
-                      <span
-                        className="mr-2 inline-block h-2.5 w-2.5 rounded-full"
-                        style={{ backgroundColor: member.color }}
-                      />
-                      {member.name}
-                      {member.role === "ADMIN" && (
-                        <span className="ml-2 text-xs text-teal-800">admin</span>
+            <ul className="mt-4 space-y-3">
+              {members.map((member) => {
+                const isSelf = member.id === me?.id;
+                const busy = busyId === member.id;
+                const editing = editingId === member.id;
+
+                return (
+                  <li
+                    key={member.id}
+                    className="rounded-2xl bg-black/[0.03] px-3 py-3 text-sm"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        {editing ? (
+                          <div className="flex flex-wrap gap-2">
+                            <input
+                              value={editName}
+                              onChange={(e) => setEditName(e.target.value)}
+                              className="min-w-0 flex-1 rounded-lg border border-black/10 px-2 py-1 text-sm outline-none ring-[var(--accent)] focus:ring-2"
+                              autoFocus
+                            />
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => void saveRename(member.id)}
+                              className="rounded-lg bg-[var(--accent)] px-2.5 py-1 text-xs text-white disabled:opacity-60"
+                            >
+                              Save
+                            </button>
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => setEditingId(null)}
+                              className="rounded-lg px-2.5 py-1 text-xs text-[var(--muted)] hover:bg-black/5"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="font-medium">
+                            <span
+                              className="mr-2 inline-block h-2.5 w-2.5 rounded-full"
+                              style={{ backgroundColor: member.color }}
+                            />
+                            {member.name}
+                            {member.role === "ADMIN" && (
+                              <span className="ml-2 text-xs text-teal-800">
+                                admin
+                              </span>
+                            )}
+                            {isSelf && (
+                              <span className="ml-2 text-xs text-[var(--muted)]">
+                                you
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        <div className="mt-0.5 text-xs text-[var(--muted)]">
+                          {member.email} · {member.status} · {member.timezone}
+                        </div>
+                      </div>
+
+                      {member.status === "PENDING" && (
+                        <div className="flex gap-1">
+                          <button
+                            disabled={busy}
+                            onClick={() =>
+                              void reviewMember(member.id, "accept")
+                            }
+                            className="rounded-lg bg-[var(--accent)] px-2.5 py-1 text-xs text-white disabled:opacity-60"
+                          >
+                            Accept
+                          </button>
+                          <button
+                            disabled={busy}
+                            onClick={() =>
+                              void reviewMember(member.id, "reject")
+                            }
+                            className="rounded-lg px-2.5 py-1 text-xs text-rose-700 hover:bg-rose-50 disabled:opacity-60"
+                          >
+                            Reject
+                          </button>
+                        </div>
                       )}
                     </div>
-                    <div className="text-xs text-[var(--muted)]">
-                      {member.email} · {member.status}
-                    </div>
-                  </div>
-                  {member.status === "PENDING" && (
-                    <div className="flex gap-1">
-                      <button
-                        onClick={() => void reviewMember(member.id, "accept")}
-                        className="rounded-lg bg-[var(--accent)] px-2.5 py-1 text-xs text-white"
-                      >
-                        Accept
-                      </button>
-                      <button
-                        onClick={() => void reviewMember(member.id, "reject")}
-                        className="rounded-lg px-2.5 py-1 text-xs text-rose-700 hover:bg-rose-50"
-                      >
-                        Reject
-                      </button>
-                    </div>
-                  )}
-                </li>
-              ))}
+
+                    {member.status !== "REJECTED" && !editing && (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => startRename(member)}
+                          className="rounded-lg bg-white px-2.5 py-1 text-xs ring-1 ring-black/10 hover:bg-black/[0.03] disabled:opacity-60"
+                        >
+                          Rename
+                        </button>
+                        {member.status === "ACTIVE" &&
+                          member.role !== "ADMIN" && (
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => void setRole(member.id, "ADMIN")}
+                              className="rounded-lg bg-white px-2.5 py-1 text-xs ring-1 ring-black/10 hover:bg-black/[0.03] disabled:opacity-60"
+                            >
+                              Make admin
+                            </button>
+                          )}
+                        {member.status === "ACTIVE" &&
+                          member.role === "ADMIN" &&
+                          !isSelf && (
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => void setRole(member.id, "MEMBER")}
+                              className="rounded-lg bg-white px-2.5 py-1 text-xs ring-1 ring-black/10 hover:bg-black/[0.03] disabled:opacity-60"
+                            >
+                              Make member
+                            </button>
+                          )}
+                        {!isSelf && (
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => void removeMember(member)}
+                            className="rounded-lg px-2.5 py-1 text-xs text-rose-700 hover:bg-rose-50 disabled:opacity-60"
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           </section>
 
